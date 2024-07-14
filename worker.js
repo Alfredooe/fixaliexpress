@@ -61,10 +61,10 @@ export default {
   <meta name="theme-color" content="${color}">
   <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
   <meta property="og:site_name" content="alimbedxpress.com created by alf">
-  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:title" content="AliExpress - ${itemID}" />
   <meta name="twitter:image" content="${imageUrl}" />
   <meta name="twitter:creator" content="@aliexpress" />
-  <meta property="og:description" content="${description}" />
+  <meta property="og:description" content="${title}" />
 </head>
 <body>
   <h1>${title}</h1>
