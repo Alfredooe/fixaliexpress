@@ -60,7 +60,7 @@ export default {
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="${color}">
   <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
-  <meta property="og:site_name" content="fixaliex">
+  <meta property="og:site_name" content="alimbedxpress.com created by alf">
   <meta name="twitter:title" content="${title}" />
   <meta name="twitter:image" content="${imageUrl}" />
   <meta name="twitter:creator" content="@aliexpress" />
