@@ -5,13 +5,13 @@ export default {
     const userAgent = request.headers.get("user-agent");
     console.log("User Agent:", userAgent);
     
-    const match = url.pathname.match(/\/item\/(\d+)\.html/);
+    const match = url.pathname.match(/\/(item|i)\/(\d+)\.html/);
     if (!match) {
       console.log("Invalid URL format:", url.pathname);
       return new Response("Invalid URL format", { status: 400 });
     }
     
-    const itemId = match[1];
+    const itemId = match[2];
     const aliExpressUrl = `https://www.aliexpress.com/item/${itemId}.html`;
     console.log("AliExpress URL:", aliExpressUrl);
     let title = 'AliExpress Product';
