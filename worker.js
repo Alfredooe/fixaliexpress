@@ -1,9 +1,22 @@
 export default {
   async fetch(request, env, ctx) {
     console.log("Worker started processing request");
-    const url = new URL(request.url);
+    var url = new URL(request.url);
     const userAgent = request.headers.get("user-agent");
     console.log("User Agent:", userAgent);
+
+    // If the url matches being a `a.aliexpress.com/<random>` link
+    // then we need to request it and get the redirect it points to.
+    if ( url.href.match(/a\.alimbedxpress\.com\/.*/) ) {
+      const test_response = await fetch(`https://a.aliexpress.com/${url.pathname}`, {
+        redirect: 'manual',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)'
+        }
+      });
+      // These links just redirect straight through to a /item/ url
+      url = new URL(test_response.headers.get("location"));
+    }
     
     const match = url.pathname.match(/\/(item|i)\/(\d+)\.html/);
     if (!match) {
