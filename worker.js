@@ -20,14 +20,27 @@ export default {
 
     try {
       console.log("Fetching AliExpress page");
-      const response = await fetch(aliExpressUrl, {
-        redirect: 'manual',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)'
+
+      var aliexpressAttempts = 1;
+      var response;
+      while (true) {
+        response = await fetch(aliExpressUrl, {
+          redirect: 'manual',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)'
+          }
+        });
+
+        console.log(`AliExpress response status (Attempt ${aliexpressAttempts}/5): ${response.status}`);
+        
+        if (response.ok) {
+          break;
         }
-      });
-      
-      console.log("AliExpress response status:", response.status);
+        if ( aliexpressAttempts >= 5 ) {
+          break;
+        }
+        aliexpressAttempts++;
+      }
 
       if (response.ok) {
         const html = await response.text();
