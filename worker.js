@@ -29,18 +29,31 @@ export default {
     console.log("AliExpress URL:", aliExpressUrl);
     let title = 'AliExpress Product';
     let description = `Item ID: ${itemId}`;
-    let imageUrl = "https://ae01.alicdn.com/kf/Sd3cc4f17a9e04008be782f0d45ff11f9e/867x267.png";
+    let imageUrl = "https://ae01.alicdn.com/kf/Sb900db0ad7604a83b297a51d9222905bm/624x160.png";
 
     try {
       console.log("Fetching AliExpress page");
-      const response = await fetch(aliExpressUrl, {
-        redirect: 'manual',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)'
+
+      var aliexpressAttempts = 1;
+      var response;
+      while (true) {
+        response = await fetch(aliExpressUrl, {
+          redirect: 'manual',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)'
+          }
+        });
+
+        console.log(`AliExpress response status (Attempt ${aliexpressAttempts}/5): ${response.status}`);
+        
+        if (response.ok) {
+          break;
         }
-      });
-      
-      console.log("AliExpress response status:", response.status);
+        if ( aliexpressAttempts >= 5 ) {
+          break;
+        }
+        aliexpressAttempts++;
+      }
 
       if (response.ok) {
         const html = await response.text();
