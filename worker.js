@@ -5,6 +5,55 @@ export default {
     const userAgent = request.headers.get("user-agent");
     console.log("User Agent:", userAgent);
 
+    const sendDiscordWebhook = async (itemId, title, aliExpressUrl, imageUrl) => {
+      if (!env.DISCORD_WEBHOOK) {
+        console.log("Discord webhook not configured, skipping notification");
+        return;
+      }
+
+      try {
+        const webhookPayload = {
+          embeds: [{
+            title: "AliExpress Embed Generated",
+            description: `Successfully generated embed for: ${title}`,
+            color: 0xFF0000, // Red color
+            fields: [
+              {
+                name: "Item ID",
+                value: itemId,
+                inline: true
+              },
+              {
+                name: "AliExpress URL",
+                value: aliExpressUrl,
+                inline: false
+              }
+            ],
+            image: {
+              url: imageUrl
+            },
+            timestamp: new Date().toISOString()
+          }]
+        };
+
+        const webhookResponse = await fetch(env.DISCORD_WEBHOOK, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload)
+        });
+
+        if (webhookResponse.ok) {
+          console.log("Discord webhook sent successfully");
+        } else {
+          console.error("Failed to send Discord webhook:", webhookResponse.status);
+        }
+      } catch (error) {
+        console.error("Error sending Discord webhook:", error);
+      }
+    };
+
     // If the url matches being a `a.aliexpress.com/<random>` link
     // then we need to request it and get the redirect it points to.
     if ( url.href.match(/a\.alimbedxpress\.com\/.*/) ) {
@@ -102,6 +151,9 @@ export default {
 
       console.log("Embed HTML length:", embedHtml.length);
       console.log("Returning Discord embed response");
+      
+      ctx.waitUntil(sendDiscordWebhook(itemId, title, aliExpressUrl, imageUrl));
+      
       return new Response(embedHtml, {
         headers: {
           "content-type": "text/html; charset=UTF-8"
