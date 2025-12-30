@@ -67,11 +67,6 @@ export default {
       });
       // These links just redirect straight through to a /item/ url
       url = new URL(test_response.headers.get("location"));
-
-      // Normalize to the US AliExpress domain for consistency.
-      if (url.hostname.endsWith('aliexpress.com')) {
-        url.hostname = 'www.aliexpress.us';
-      }
     }
     
     const match = url.pathname.match(/\/(item|i)\/(\d+)\.html/);
@@ -81,7 +76,7 @@ export default {
     }
     
     const itemId = match[2];
-  const aliExpressUrl = `https://www.aliexpress.us/item/${itemId}.html`;
+    const aliExpressUrl = `https://www.aliexpress.com/item/${itemId}.html`;
     console.log("AliExpress URL:", aliExpressUrl);
     let title = 'AliExpress Product';
     let description = `Item ID: ${itemId}`;
