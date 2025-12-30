@@ -5,6 +5,8 @@ export default {
     const userAgent = request.headers.get("user-agent");
     console.log("User Agent:", userAgent);
 
+    const ALIEXPRESS_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
+
     const sendDiscordWebhook = async (itemId, title, aliExpressUrl, imageUrl) => {
       if (!env.DISCORD_WEBHOOK) {
         console.log("Discord webhook not configured, skipping notification");
@@ -60,7 +62,7 @@ export default {
       const test_response = await fetch(`https://a.aliexpress.com/${url.pathname}`, {
         redirect: 'manual',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)'
+          'User-Agent': ALIEXPRESS_UA
         }
       });
       // These links just redirect straight through to a /item/ url
@@ -89,7 +91,7 @@ export default {
         response = await fetch(aliExpressUrl, {
           redirect: 'manual',
           headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)'
+            'User-Agent': ALIEXPRESS_UA
           }
         });
 
