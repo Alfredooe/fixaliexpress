@@ -82,33 +82,64 @@ export default {
     let description = `Item ID: ${itemId}`;
     let imageUrl = "https://ae01.alicdn.com/kf/Sb900db0ad7604a83b297a51d9222905bm/624x160.png";
 
+    const getHtmlViaBrowserRendering = async (targetUrl) => {
+      if (!env.MYBROWSER) return null;
+
+      // Lazy import so the Worker can still run even if nodejs_compat / package isn't present yet.
+      const { default: puppeteer } = await import("@cloudflare/puppeteer");
+      const browser = await puppeteer.launch(env.MYBROWSER);
+      try {
+        const page = await browser.newPage();
+        await page.setUserAgent(ALIEXPRESS_UA);
+        await page.goto(targetUrl, { waitUntil: "networkidle2" });
+        return await page.content();
+      } finally {
+        await browser.close();
+      }
+    };
+
     try {
       console.log("Fetching AliExpress page");
 
-      var aliexpressAttempts = 1;
-      var response;
-      while (true) {
-        response = await fetch(aliExpressUrl, {
-          redirect: 'manual',
-          headers: {
-            'User-Agent': ALIEXPRESS_UA
-          }
-        });
-
-        console.log(`AliExpress response status (Attempt ${aliexpressAttempts}/5): ${response.status}`);
-        
-        if (response.ok) {
-          break;
+      let html = null;
+      try {
+        html = await getHtmlViaBrowserRendering(aliExpressUrl);
+        if (html) {
+          console.log("Browser Rendering HTML length:", html.length);
         }
-        if ( aliexpressAttempts >= 5 ) {
-          break;
-        }
-        aliexpressAttempts++;
+      } catch (e) {
+        console.warn("Browser Rendering failed, falling back to normal fetch:", e);
       }
 
-      if (response.ok) {
-        const html = await response.text();
-        console.log("AliExpress HTML length:", html.length);
+      if (!html) {
+        var aliexpressAttempts = 1;
+        var response;
+        while (true) {
+          response = await fetch(aliExpressUrl, {
+            redirect: 'manual',
+            headers: {
+              'User-Agent': ALIEXPRESS_UA
+            }
+          });
+
+          console.log(`AliExpress response status (Attempt ${aliexpressAttempts}/5): ${response.status}`);
+          
+          if (response.ok) {
+            break;
+          }
+          if ( aliexpressAttempts >= 5 ) {
+            break;
+          }
+          aliexpressAttempts++;
+        }
+
+        if (response.ok) {
+          html = await response.text();
+          console.log("AliExpress HTML length:", html.length);
+        }
+      }
+
+      if (html) {
 
         const getMetaContent = (name) => {
           const match = html.match(new RegExp(`<meta\\s+property="og:${name}"\\s+content="([^"]*)"`, 'i'));

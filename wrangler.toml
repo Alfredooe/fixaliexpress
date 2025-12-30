@@ -1,5 +1,11 @@
 name = "fixaliexpress"
 main = "worker.js"
 compatibility_date = "2023-08-23"
+
+compatibility_flags = ["nodejs_compat"]
+
+[browser]
+binding = "MYBROWSER"
+
 [observability.logs]
 enabled = true
