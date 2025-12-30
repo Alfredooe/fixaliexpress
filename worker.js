@@ -78,6 +78,7 @@ export default {
     const itemId = match[2];
     const aliExpressUrl = `https://www.aliexpress.com/item/${itemId}.html`;
     console.log("AliExpress URL:", aliExpressUrl);
+
     let title = 'AliExpress Product';
     let description = `Item ID: ${itemId}`;
     let imageUrl = "https://ae01.alicdn.com/kf/Sb900db0ad7604a83b297a51d9222905bm/624x160.png";
@@ -120,74 +121,16 @@ export default {
       }
     };
 
-    // For Discord requests, skip the blocking fetch here — we'll do it inside the streaming handler.
+    // Non-Discord UAs get an immediate redirect — no fetching, no delay.
     const isDiscord = userAgent && userAgent.includes("Discord");
-
     if (!isDiscord) {
-      try {
-        console.log("Fetching AliExpress page");
-
-        let html = null;
-        try {
-          html = await getHtmlViaBrowserRendering(aliExpressUrl);
-          if (html) {
-            console.log("Browser Rendering HTML length:", html.length);
-          }
-        } catch (e) {
-          console.warn("Browser Rendering failed, falling back to normal fetch:", e);
-        }
-
-        if (!html) {
-          var aliexpressAttempts = 1;
-          var response;
-          while (true) {
-            response = await fetch(aliExpressUrl, {
-              redirect: 'manual',
-              headers: {
-                'User-Agent': ALIEXPRESS_UA
-              }
-            });
-
-            console.log(`AliExpress response status (Attempt ${aliexpressAttempts}/5): ${response.status}`);
-            
-            if (response.ok) {
-              break;
-            }
-            if ( aliexpressAttempts >= 5 ) {
-              break;
-            }
-            aliexpressAttempts++;
-          }
-
-          if (response.ok) {
-            html = await response.text();
-            console.log("AliExpress HTML length:", html.length);
-          }
-        }
-
-        if (html) {
-
-          const getMetaContent = (name) => {
-            const match = html.match(new RegExp(`<meta\\s+property="og:${name}"\\s+content="([^"]*)"`, 'i'));
-            console.log(`Extracting og:${name}:`, match ? match[1] : "Not found");
-            return match ? match[1] : null;
-          };
-
-          title = getMetaContent('title') || title;
-          description = getMetaContent('description') || description;
-          imageUrl = getMetaContent('image') || imageUrl;
-        } else {
-          console.log("Failed to fetch AliExpress page, using fallback data");
-        }
-      } catch (error) {
-        console.error("Error fetching AliExpress page:", error);
-        console.log("Using fallback data due to error");
-      }
+      console.log("Non-Discord UA, redirecting immediately");
+      return Response.redirect(aliExpressUrl, 302);
     }
 
-    if (isDiscord) {
-      console.log("Preparing Discord embed with streaming stall technique");
-      const color = "#FF0000";
+    // At this point, we know it's a Discord request.
+    console.log("Preparing Discord embed with streaming stall technique");
+    const color = "#FF0000";
 
       // Use a TransformStream to drip bytes while Browser Rendering works.
       const { readable, writable } = new TransformStream();
@@ -338,9 +281,5 @@ export default {
           "content-type": "text/html; charset=UTF-8",
         }
       });
-    }
-
-    console.log("Redirecting to AliExpress");
-    return Response.redirect(aliExpressUrl, 302);
   },
 };
