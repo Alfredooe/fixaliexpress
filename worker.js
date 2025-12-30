@@ -91,7 +91,29 @@ export default {
       try {
         const page = await browser.newPage();
         await page.setUserAgent(ALIEXPRESS_UA);
-        await page.goto(targetUrl, { waitUntil: "networkidle2" });
+
+        // Block unnecessary resources to speed up page load.
+        await page.setRequestInterception(true);
+        page.on('request', (req) => {
+          const resourceType = req.resourceType();
+          // Block images, stylesheets, fonts, media — we only need the HTML/JS for meta tags.
+          if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+            req.abort();
+          } else {
+            req.continue();
+          }
+        });
+
+        // Use domcontentloaded instead of networkidle2 — faster, usually enough for meta tags.
+        // Set a 8-second timeout to fail fast if the page is slow.
+        await page.goto(targetUrl, { 
+          waitUntil: "domcontentloaded",
+          timeout: 8000
+        });
+
+        // Give JS a brief moment to populate meta tags if needed.
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         return await page.content();
       } finally {
         await browser.close();
