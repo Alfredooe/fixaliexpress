@@ -98,98 +98,222 @@ export default {
       }
     };
 
-    try {
-      console.log("Fetching AliExpress page");
+    // For Discord requests, skip the blocking fetch here — we'll do it inside the streaming handler.
+    const isDiscord = userAgent && userAgent.includes("Discord");
 
-      let html = null;
+    if (!isDiscord) {
       try {
-        html = await getHtmlViaBrowserRendering(aliExpressUrl);
-        if (html) {
-          console.log("Browser Rendering HTML length:", html.length);
-        }
-      } catch (e) {
-        console.warn("Browser Rendering failed, falling back to normal fetch:", e);
-      }
+        console.log("Fetching AliExpress page");
 
-      if (!html) {
-        var aliexpressAttempts = 1;
-        var response;
-        while (true) {
-          response = await fetch(aliExpressUrl, {
-            redirect: 'manual',
-            headers: {
-              'User-Agent': ALIEXPRESS_UA
+        let html = null;
+        try {
+          html = await getHtmlViaBrowserRendering(aliExpressUrl);
+          if (html) {
+            console.log("Browser Rendering HTML length:", html.length);
+          }
+        } catch (e) {
+          console.warn("Browser Rendering failed, falling back to normal fetch:", e);
+        }
+
+        if (!html) {
+          var aliexpressAttempts = 1;
+          var response;
+          while (true) {
+            response = await fetch(aliExpressUrl, {
+              redirect: 'manual',
+              headers: {
+                'User-Agent': ALIEXPRESS_UA
+              }
+            });
+
+            console.log(`AliExpress response status (Attempt ${aliexpressAttempts}/5): ${response.status}`);
+            
+            if (response.ok) {
+              break;
             }
-          });
+            if ( aliexpressAttempts >= 5 ) {
+              break;
+            }
+            aliexpressAttempts++;
+          }
 
-          console.log(`AliExpress response status (Attempt ${aliexpressAttempts}/5): ${response.status}`);
-          
           if (response.ok) {
-            break;
+            html = await response.text();
+            console.log("AliExpress HTML length:", html.length);
           }
-          if ( aliexpressAttempts >= 5 ) {
-            break;
-          }
-          aliexpressAttempts++;
         }
 
-        if (response.ok) {
-          html = await response.text();
-          console.log("AliExpress HTML length:", html.length);
+        if (html) {
+
+          const getMetaContent = (name) => {
+            const match = html.match(new RegExp(`<meta\\s+property="og:${name}"\\s+content="([^"]*)"`, 'i'));
+            console.log(`Extracting og:${name}:`, match ? match[1] : "Not found");
+            return match ? match[1] : null;
+          };
+
+          title = getMetaContent('title') || title;
+          description = getMetaContent('description') || description;
+          imageUrl = getMetaContent('image') || imageUrl;
+        } else {
+          console.log("Failed to fetch AliExpress page, using fallback data");
         }
+      } catch (error) {
+        console.error("Error fetching AliExpress page:", error);
+        console.log("Using fallback data due to error");
       }
-
-      if (html) {
-
-        const getMetaContent = (name) => {
-          const match = html.match(new RegExp(`<meta\\s+property="og:${name}"\\s+content="([^"]*)"`, 'i'));
-          console.log(`Extracting og:${name}:`, match ? match[1] : "Not found");
-          return match ? match[1] : null;
-        };
-
-        title = getMetaContent('title') || title;
-        description = getMetaContent('description') || description;
-        imageUrl = getMetaContent('image') || imageUrl;
-      } else {
-        console.log("Failed to fetch AliExpress page, using fallback data");
-      }
-    } catch (error) {
-      console.error("Error fetching AliExpress page:", error);
-      console.log("Using fallback data due to error");
     }
 
-    if (userAgent && userAgent.includes("Discord")) {
-      console.log("Preparing Discord embed");
-      const color = "#FF0000"; // Theme color
+    if (isDiscord) {
+      console.log("Preparing Discord embed with streaming stall technique");
+      const color = "#FF0000";
 
-      const embedHtml = `<html>
+      // Use a TransformStream to drip bytes while Browser Rendering works.
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+
+      // Start responding immediately with the HTML preamble.
+      const preamble = `<!DOCTYPE html>
+<html>
 <head>
-  <title>${title}</title>
+  <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+  <!-- Waiting for product data -->`;
+
+      // Kick off the streaming response handler in the background.
+      ctx.waitUntil((async () => {
+        try {
+          await writer.write(encoder.encode(preamble));
+
+          // Drip whitespace/comments every 500ms while we wait for Browser Rendering.
+          // We'll race between the data fetch and a timeout.
+          const MAX_STALL_MS = 25000; // Max time to stall before giving up
+          const DRIP_INTERVAL_MS = 500;
+          const startTime = Date.now();
+
+          let fetchedTitle = title;
+          let fetchedDescription = description;
+          let fetchedImageUrl = imageUrl;
+          let dataReady = false;
+
+          // Start Browser Rendering fetch in parallel.
+          const fetchPromise = (async () => {
+            try {
+              let html = null;
+              try {
+                html = await getHtmlViaBrowserRendering(aliExpressUrl);
+                if (html) {
+                  console.log("Browser Rendering HTML length:", html.length);
+                }
+              } catch (e) {
+                console.warn("Browser Rendering failed in streaming path:", e);
+              }
+
+              // Fallback to normal fetch if Browser Rendering failed.
+              if (!html) {
+                let attempts = 0;
+                while (attempts < 5) {
+                  attempts++;
+                  const r = await fetch(aliExpressUrl, {
+                    redirect: 'manual',
+                    headers: { 'User-Agent': ALIEXPRESS_UA }
+                  });
+                  if (r.ok) {
+                    html = await r.text();
+                    break;
+                  }
+                }
+              }
+
+              if (html) {
+                const getMetaContent = (name) => {
+                  const m = html.match(new RegExp(`<meta\\s+property="og:${name}"\\s+content="([^"]*)"`, 'i'));
+                  return m ? m[1] : null;
+                };
+                fetchedTitle = getMetaContent('title') || fetchedTitle;
+                fetchedDescription = getMetaContent('description') || fetchedDescription;
+                fetchedImageUrl = getMetaContent('image') || fetchedImageUrl;
+              }
+            } catch (e) {
+              console.error("Error in streaming fetch:", e);
+            }
+            dataReady = true;
+          })();
+
+          // Drip loop: send whitespace/comments while waiting.
+          let dripCount = 0;
+          while (!dataReady && (Date.now() - startTime) < MAX_STALL_MS) {
+            await new Promise(resolve => setTimeout(resolve, DRIP_INTERVAL_MS));
+            if (!dataReady) {
+              dripCount++;
+              // Send a small comment to keep the connection alive.
+              await writer.write(encoder.encode(`\n  <!-- . -->`));
+              if (dripCount % 10 === 0) {
+                console.log(`Still waiting for data... ${Math.round((Date.now() - startTime) / 1000)}s elapsed`);
+              }
+            }
+          }
+
+          // Wait for fetch to complete if it hasn't already (with a small grace period).
+          if (!dataReady) {
+            await Promise.race([
+              fetchPromise,
+              new Promise(resolve => setTimeout(resolve, 2000))
+            ]);
+          }
+
+          // Now send the rest of the HTML with the (hopefully real) data.
+          const restOfHead = `
+  <title>${fetchedTitle}</title>
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="${color}">
-  <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
   <meta property="og:site_name" content="alimbedxpress.com created by alf">
+  <meta property="og:title" content="${fetchedTitle}" />
+  <meta property="og:image" content="${fetchedImageUrl}" />
+  <meta property="og:description" content="${fetchedDescription}" />
   <meta name="twitter:title" content="AliExpress - ${itemId}" />
-  <meta name="twitter:image" content="${imageUrl}" />
+  <meta name="twitter:image" content="${fetchedImageUrl}" />
   <meta name="twitter:creator" content="@aliexpress" />
-  <meta property="og:description" content="${title}" />
 </head>
 <body>
-  <h1>${title}</h1>
-  <p>${description}</p>
-  <p>Click to view on AliExpresss</p>
-  <img src="${imageUrl}" alt="${title}">
+  <h1>${fetchedTitle}</h1>
+  <p>${fetchedDescription}</p>
+  <p>Click to view on AliExpress</p>
+  <img src="${fetchedImageUrl}" alt="${fetchedTitle}">
 </body>
 </html>`;
 
-      console.log("Embed HTML length:", embedHtml.length);
-      console.log("Returning Discord embed response");
-      
-      ctx.waitUntil(sendDiscordWebhook(itemId, title, aliExpressUrl, imageUrl));
-      
-      return new Response(embedHtml, {
+          await writer.write(encoder.encode(restOfHead));
+          await writer.close();
+
+          console.log(`Streaming response completed. Total time: ${Date.now() - startTime}ms`);
+
+          // Fire webhook with the fetched data.
+          await sendDiscordWebhook(itemId, fetchedTitle, aliExpressUrl, fetchedImageUrl);
+
+        } catch (e) {
+          console.error("Streaming response error:", e);
+          try {
+            // Try to close gracefully with fallback content.
+            const fallback = `
+  <title>${title}</title>
+  <meta property="og:title" content="${title}" />
+  <meta property="og:image" content="${imageUrl}" />
+</head>
+<body><h1>${title}</h1></body>
+</html>`;
+            await writer.write(encoder.encode(fallback));
+            await writer.close();
+          } catch (closeErr) {
+            console.error("Failed to close stream:", closeErr);
+            await writer.abort();
+          }
+        }
+      })());
+
+      // Return the streaming response immediately.
+      return new Response(readable, {
         headers: {
-          "content-type": "text/html; charset=UTF-8"
+          "content-type": "text/html; charset=UTF-8",
         }
       });
     }
