@@ -1,0 +1,9 @@
+{
+  "name": "fixaliexpress",
+  "private": true,
+  "version": "0.0.0",
+  "devDependencies": {
+    "wrangler": "^4.54.0",
+    "@cloudflare/puppeteer": "^0.0.21"
+  }
+}
