@@ -9,3 +9,6 @@ binding = "MYBROWSER"
 
 [observability.logs]
 enabled = true
+
+[placement]
+region = "aws:eu-west-2"
